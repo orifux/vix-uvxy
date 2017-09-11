@@ -1,8 +1,11 @@
+import csv
 import numpy as np
-import pandas
+import pandas as df
 import requests
 import io
 import datetime
+import os.path
+import shutil 
 from pandas_datareader.data import Options
 
 
@@ -11,6 +14,8 @@ from pandas_datareader.data import Options
 
 #### getting uvxy data from google web site ####
 #### https://www.google.com/finance/historical?q=.VIX&startdate=Jul%2027,%202017&enddate=Jul%2027,%202017&output=csv ####
+
+
 
 def getStockClosePrice(stock, date):
     stock = stock
@@ -26,62 +31,77 @@ def getStockClosePrice(stock, date):
     response = requests.get(url)
     #except:
     #print "Unexpected error:", sys.exc_info()
-    df = pandas.read_csv(io.StringIO(response.content.decode('utf-8')))
+    df_ = df.read_csv(io.StringIO(response.content.decode('utf-8')))
     #print(df)
     try:
-        return df.get_value(0,'Close');
+        return df_.get_value(0,'Close');
     except:
-        return -1;    
+        return 'NaN';  
+
+def getVIXClosePrice(date):
     
-def getVIXClosePrice(startDate,endDate):
-    
+    path ='./temp/'
+    fileName = date.strftime("%d-%m-%Y") + '.csv'
     url = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/vixcurrent.csv'
     response = requests.get(url)
 
-    df = pandas.read_csv(io.StringIO(response.content.decode('utf-8')),skiprows=1,index_col=0)
+    df_ = df.read_csv(io.StringIO(response.content.decode('utf-8')),skiprows=1,index_col=0)
     #print df
+    if not(os.path.isfile(path+fileName)):
+        shutil.rmtree(path,ignore_errors=True, onerror=None)
+        os.makedirs(path)
+        df_.to_csv(path+fileName)
     try:
-        df=df.loc[startDate.strftime("%m/%d/%Y"):endDate.strftime("%m/%d/%Y"),'VIX Close']
-        return df
+        df_=df_.loc[date.strftime("%m/%d/%Y"),'VIX Close']
+        #print df
+        return df_
     except:
-        return -1;   
+        return 'NaN';
 
 
 def main():
     #print getVixClosePrice('08/22/2017')
     #currDate = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%m/%d/%Y")
-    startDate = (datetime.date.today() - datetime.timedelta(days=4))
-    endDate = (datetime.date.today() - datetime.timedelta(days=1))
-    #print currDate
+    date = (datetime.date.today() - datetime.timedelta(days=3))
+    #endDate = (datetime.date.today() - datetime.timedelta(days=1))
+    print 'for date:' , date
     #print currDate.strftime("%m/%d/%Y")
-    df_vixClosePrice=getVIXClosePrice(startDate,endDate)
-    print df_vixClosePrice.index.values
+    #print getVIXClosePrice(date)
+    #print df_vixClosePrice
     #print getStockClosePrice('UVXY', startDate)
     
-        
+      
     todays_date = datetime.datetime.now().date()
-    index = pandas.date_range(todays_date-datetime.timedelta(4), periods=4, freq='D')
+    dateArr = df.date_range(todays_date-datetime.timedelta(4), periods=4, freq='D')
     #print index[1]
     
     #columns = ['pos_num','open_pos_date','vix_pos_price','uvxy_pos_price','uvxy_vix_pos_ratio','uvxy_vix_curr_pos','os_vix_qty','pos_vix_op_price','pos_vix_strick','pos_vix_exp','pos_uvxy_qty','pos_uvxy_op_price','pos_uvxy_strick','pos_uvxy_exp','pos_vix_amount','pos_uvxy_amount','curr_pos_vix_value','curr_pos_uvxy_value','days_pass','is_55_days_pass','pos_ratio*0.75 >=curr_ratio','pos_status','pos_gain']
     columns = ['pos_num','open_pos_date']##,'vix_pos_price','uvxy_pos_price','uvxy_vix_pos_ratio','uvxy_vix_curr_pos','os_vix_qty','pos_vix_op_price','pos_vix_strick','pos_vix_exp','pos_uvxy_qty','pos_uvxy_op_price','pos_uvxy_strick','pos_uvxy_exp','pos_vix_amount','pos_uvxy_amount','curr_pos_vix_value','curr_pos_uvxy_value','days_pass','is_55_days_pass','pos_ratio*0.75 >=curr_ratio','pos_status','pos_gain']
-    #A = np.array([[1,2],[4,5]])
-    Alist = []
-    Alist = df_vixClosePrice.values
-    print Alist
-    for i in range(100):
-        print i
-      #  newrow = np.array([i,getVIXClosePrice(index[i])])
-       # print newrow
-       # Alist.append(newrow)
-    A = np.array(Alist)
-    print A
+      
+    np_array_list = []
+    
+    for i in range(4):
+        print i ,'------'
+        open_pos_date = dateArr[i]
+        vix_pos_price = getVIXClosePrice(dateArr[i])
+        uvxy_pos_price=getStockClosePrice('UVXY',dateArr[i])
+        if vix_pos_price != 'NaN': 
+            uvxy_vix_pos_ratio = (uvxy_pos_price/vix_pos_price)
+        else:
+            uvxy_vix_pos_ratio = 'NaN'
+        res = np.array([open_pos_date,vix_pos_price,uvxy_pos_price,uvxy_vix_pos_ratio])
+        np_array_list.append(res)
+    print np_array_list
     print '-------'
-    df_ = pandas.DataFrame(A,index=index, columns=columns)
+    comb_np_array = np.vstack(np_array_list)
+    big_frame = df.DataFrame(comb_np_array)
+    #df_ = pandas.DataFrame(result_array,index=index, columns=columns)
     #df_ = df_.fillna(0) # with 0s rather than NaNs
-    print df_
+    print big_frame
     
 main()
+
+'''
 aapl = Options('uvxy', 'yahoo')
 data = aapl.get_all_data()
 ##print data
@@ -94,7 +114,7 @@ print '-------------'
 print data.loc[(46, slice(None), 'call'),:] #.iloc[0:5, 0:5]
 print '-------------'
 
-
+'''
 
 
 
