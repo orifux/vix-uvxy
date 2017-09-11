@@ -76,7 +76,7 @@ def main():
     #print index[1]
     
     #columns = ['pos_num','open_pos_date','vix_pos_price','uvxy_pos_price','uvxy_vix_pos_ratio','uvxy_vix_curr_pos','os_vix_qty','pos_vix_op_price','pos_vix_strick','pos_vix_exp','pos_uvxy_qty','pos_uvxy_op_price','pos_uvxy_strick','pos_uvxy_exp','pos_vix_amount','pos_uvxy_amount','curr_pos_vix_value','curr_pos_uvxy_value','days_pass','is_55_days_pass','pos_ratio*0.75 >=curr_ratio','pos_status','pos_gain']
-    columns = ['pos_num','open_pos_date']##,'vix_pos_price','uvxy_pos_price','uvxy_vix_pos_ratio','uvxy_vix_curr_pos','os_vix_qty','pos_vix_op_price','pos_vix_strick','pos_vix_exp','pos_uvxy_qty','pos_uvxy_op_price','pos_uvxy_strick','pos_uvxy_exp','pos_vix_amount','pos_uvxy_amount','curr_pos_vix_value','curr_pos_uvxy_value','days_pass','is_55_days_pass','pos_ratio*0.75 >=curr_ratio','pos_status','pos_gain']
+    columns = ['pos_num','open_pos_date']##,'vix_pos_price','uvxy_pos_price','uvxy_vix_pos_ratio','uvxy_vix_curr_pos','pos_vix_qty','pos_vix_op_price','pos_vix_strick','pos_vix_exp','pos_uvxy_qty','pos_uvxy_op_price','pos_uvxy_strick','pos_uvxy_exp','pos_vix_amount','pos_uvxy_amount','curr_pos_vix_value','curr_pos_uvxy_value','days_pass','is_55_days_pass','pos_ratio*0.75 >=curr_ratio','pos_status','pos_gain']
       
     np_array_list = []
     
@@ -87,9 +87,11 @@ def main():
         uvxy_pos_price=getStockClosePrice('UVXY',dateArr[i])
         if vix_pos_price != 'NaN': 
             uvxy_vix_pos_ratio = (uvxy_pos_price/vix_pos_price)
+            uvxy_vix_curr_pos = uvxy_vix_pos_ratio
         else:
             uvxy_vix_pos_ratio = 'NaN'
-        res = np.array([open_pos_date,vix_pos_price,uvxy_pos_price,uvxy_vix_pos_ratio])
+            uvxy_vix_curr_pos = 'NaN'
+        res = np.array([open_pos_date,vix_pos_price,uvxy_pos_price,uvxy_vix_pos_ratio,uvxy_vix_curr_pos])
         np_array_list.append(res)
     print np_array_list
     print '-------'
