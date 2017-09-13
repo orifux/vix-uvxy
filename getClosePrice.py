@@ -1,4 +1,5 @@
 import csv
+import glob
 import numpy as np
 import pandas as df
 import requests
@@ -7,8 +8,11 @@ import datetime
 import os.path
 import shutil 
 from pandas_datareader.data import Options
+from dircache import listdir
+from pip._vendor.distlib._backport.tarfile import TUREAD
+from pyasn1.compat.octets import null
 
-
+g_daysToClase = 5
 #### getting vix data from cboe web site ####
 #### http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/vixcurrent.csv ####
 
@@ -36,15 +40,15 @@ def getStockClosePrice(stock, date):
     try:
         return df_.get_value(0,'Close');
     except:
-        return 'NaN';  
+        return 'NaN';
 
 def getVIXClosePrice(date):
     
     path ='./temp/'
     fileName = datetime.datetime.now().strftime("%d-%m-%Y") + '.csv'
-
-    #print df
-    if not(os.path.isfile(path+fileName)):
+    existfile = listdir(path)[0].split(".csv",1)[0] #glob.glob(path + '*')
+    existFileDate = datetime.datetime.strptime(existfile, "%d-%m-%Y")
+    if (existFileDate < date): # create new file with updated vix data
         url = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/vixcurrent.csv'
         response = requests.get(url)
         df_ = df.read_csv(io.StringIO(response.content.decode('utf-8')),skiprows=1,index_col=0)
@@ -52,9 +56,8 @@ def getVIXClosePrice(date):
         os.makedirs(path)
         df_.to_csv(path+fileName)
     try:
-        df_ = df.read_csv(path+fileName,index_col=None, header=0)
+        df_ = df.read_csv(path+fileName,index_col='Date', header=0)
         df_ = df_.loc[date.strftime("%m/%d/%Y"),'VIX Close']
-        #print df
         return df_
     except:
         return 'NaN';
@@ -63,7 +66,7 @@ def getVIXClosePrice(date):
 def main():
     #print getVixClosePrice('08/22/2017')
     #currDate = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%m/%d/%Y")
-    date = (datetime.date.today() - datetime.timedelta(days=3))
+    date = (datetime.date.today() - datetime.timedelta(days=20))
     #endDate = (datetime.date.today() - datetime.timedelta(days=1))
     print 'for date:' , date
     #print currDate.strftime("%m/%d/%Y")
@@ -73,25 +76,26 @@ def main():
     
       
     todays_date = datetime.datetime.now().date()
-    dateArr = df.date_range(todays_date-datetime.timedelta(4), periods=4, freq='D')
+    dateArr = df.date_range(todays_date-datetime.timedelta(20), periods=20, freq='D')
     #print index[1]
     
     #columns = ['pos_num','open_pos_date','vix_pos_price','uvxy_pos_price','uvxy_vix_pos_ratio','uvxy_vix_curr_pos','os_vix_qty','pos_vix_op_price','pos_vix_strick','pos_vix_exp','pos_uvxy_qty','pos_uvxy_op_price','pos_uvxy_strick','pos_uvxy_exp','pos_vix_amount','pos_uvxy_amount','curr_pos_vix_value','curr_pos_uvxy_value','days_pass','is_55_days_pass','pos_ratio*0.75 >=curr_ratio','pos_status','pos_gain']
-    columns = ['pos_num','open_pos_date']##,'vix_pos_price','uvxy_pos_price','uvxy_vix_pos_ratio','uvxy_vix_curr_pos','pos_vix_qty','pos_vix_op_price','pos_vix_strick','pos_vix_exp','pos_uvxy_qty','pos_uvxy_op_price','pos_uvxy_strick','pos_uvxy_exp','pos_vix_amount','pos_uvxy_amount','curr_pos_vix_value','curr_pos_uvxy_value','days_pass','is_55_days_pass','pos_ratio*0.75 >=curr_ratio','pos_status','pos_gain']
-      
+    columns = ['pos_num','open_pos_date','vix_pos_price','uvxy_pos_price','uvxy_vix_pos_ratio','uvxy_vix_curr_pos','pos_vix_qty','pos_vix_op_price','pos_vix_strick','pos_vix_exp','pos_uvxy_qty','pos_uvxy_op_price','pos_uvxy_strick','pos_uvxy_exp','pos_vix_amount','pos_uvxy_amount','curr_pos_vix_value','curr_pos_uvxy_value','days_pass','is_55_days_pass','pos_ratio*0.75 >=curr_ratio','pos_status','pos_gain']
+  
     np_array_list = []
     
-    for i in range(4):
+    for i in range(20):
         print i ,'------'
         open_pos_date = dateArr[i]
         vix_pos_price = getVIXClosePrice(dateArr[i])
         uvxy_pos_price=getStockClosePrice('UVXY',dateArr[i])
+        print 'date: ' , open_pos_date, 'vix: ', vix_pos_price, 'uvxy: ',  uvxy_pos_price
         if vix_pos_price != 'NaN': 
             uvxy_vix_pos_ratio = (uvxy_pos_price/vix_pos_price)
             uvxy_vix_curr_pos = uvxy_vix_pos_ratio
             pos_vix_qty = (vix_pos_price/uvxy_pos_price)
             if pos_vix_qty < 1:
-                pos_vix_qty=round(pos_vix_qty)
+                pos_vix_qty=round(1/pos_vix_qty)
                 pos_uvxy_qty =1
             else:
                 pos_vix_qty = 1
@@ -100,13 +104,24 @@ def main():
             pos_vix_strick = 99
             pos_vix_exp = '2018-01-01'
             pos_uvxy_op_price = 999
+            curr_vix_op_price = 888
+            curr_uvxy_op_price = 888
             pos_uvxy_strick = 99
             pos_uvxy_exp= '2018-01-01'
             pos_vix_amount = pos_vix_op_price * pos_vix_qty
-            pos_uvxy_amount = pos_uvxy_op_price*pos_uvxy_qty         
+            pos_uvxy_amount = pos_uvxy_op_price*pos_uvxy_qty     
+            curr_pos_vix_value = pos_vix_qty * curr_vix_op_price
+            curr_pos_uvxy_value = pos_uvxy_qty * curr_uvxy_op_price
+            days_pass  = (datetime.datetime.now() - open_pos_date).days
+            is_55_days_pass = True if days_pass >=g_daysToClase else False
+            pos_ratio_075 = True if uvxy_vix_curr_pos*0.75 >= uvxy_vix_pos_ratio else False
+            pos_status = 'Closed' if (pos_ratio_075 or is_55_days_pass) else 'Open'     
+            pos_gain = curr_pos_vix_value - pos_vix_amount + pos_uvxy_amount - curr_pos_uvxy_value
         else:
             uvxy_vix_pos_ratio = 'NaN'
             uvxy_vix_curr_pos = 'NaN'
+            pos_vix_qty = 'NaN'
+            pos_uvxy_qty = 'NaN'
             pos_vix_op_price = 'NaN'
             pos_vix_strick = 'NaN'
             pos_vix_exp = 'NaN'
@@ -115,13 +130,26 @@ def main():
             pos_uvxy_exp = 'NaN'
             pos_vix_amount = 'NaN'
             pos_uvxy_amount = 'NaN'
+            curr_vix_op_price = 'NaN'
+            curr_uvxy_op_price = 'NaN'
+            curr_pos_vix_value = 'NaN'
+            curr_pos_uvxy_value = 'NaN'
+            days_pass  = 'NaN'
+            is_55_days_pass = 'NaN'
+            pos_ratio_075 = 'NaN'
+            pos_status = 'NaN'
+            pos_gain = 'NaA'
             
-        res = np.array([open_pos_date,vix_pos_price,uvxy_pos_price,uvxy_vix_pos_ratio,uvxy_vix_curr_pos, pos_vix_qty,pos_vix_op_price, pos_vix_strick,pos_vix_exp, pos_uvxy_qty,pos_uvxy_op_price,pos_uvxy_qty,pos_uvxy_strick,pos_uvxy_exp,pos_vix_amount,pos_uvxy_amount])
+        res = np.array([open_pos_date.strftime("%d-%m-%Y"),vix_pos_price,uvxy_pos_price,uvxy_vix_pos_ratio,uvxy_vix_curr_pos, pos_vix_qty,pos_vix_op_price, pos_vix_strick,pos_vix_exp, pos_uvxy_qty,pos_uvxy_op_price,pos_uvxy_qty,pos_uvxy_strick,pos_uvxy_exp,pos_vix_amount,pos_uvxy_amount,curr_pos_vix_value,curr_pos_uvxy_value,days_pass,is_55_days_pass,pos_ratio_075, pos_status, pos_gain])
         np_array_list.append(res)
-    print np_array_list
     print '-------'
+    
     comb_np_array = np.vstack(np_array_list)
-    big_frame = df.DataFrame(comb_np_array)
+    big_frame = df.DataFrame(comb_np_array)    
+    big_frame.columns = ["open_pos_date","vix_pos_price","uvxy_pos_price","uvxy_vix_pos_ratio","uvxy_vix_curr_pos", "pos_vix_qty","pos_vix_op_price", "pos_vix_strick","pos_vix_exp", "pos_uvxy_qty","pos_uvxy_op_price","pos_uvxy_qty","pos_uvxy_strick","pos_uvxy_exp","pos_vix_amount","pos_uvxy_amount","curr_pos_vix_value","curr_pos_uvxy_value","days_pass","is_55_days_pass","pos_ratio_075", "pos_status", "pos_gain"]
+    
+#    big_frame.to_csv(newFileName + "_" + str(year) + ".csv", index=False,header=True)
+
     #df_ = pandas.DataFrame(result_array,index=index, columns=columns)
     #df_ = df_.fillna(0) # with 0s rather than NaNs
     print big_frame
