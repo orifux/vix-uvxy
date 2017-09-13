@@ -3,7 +3,7 @@ import numpy as np
 import pandas as df
 import requests
 import io
-import datetime
+import datetime 
 import os.path
 import shutil 
 from pandas_datareader.data import Options
@@ -41,18 +41,19 @@ def getStockClosePrice(stock, date):
 def getVIXClosePrice(date):
     
     path ='./temp/'
-    fileName = date.strftime("%d-%m-%Y") + '.csv'
-    url = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/vixcurrent.csv'
-    response = requests.get(url)
+    fileName = datetime.datetime.now().strftime("%d-%m-%Y") + '.csv'
 
-    df_ = df.read_csv(io.StringIO(response.content.decode('utf-8')),skiprows=1,index_col=0)
     #print df
     if not(os.path.isfile(path+fileName)):
+        url = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/vixcurrent.csv'
+        response = requests.get(url)
+        df_ = df.read_csv(io.StringIO(response.content.decode('utf-8')),skiprows=1,index_col=0)
         shutil.rmtree(path,ignore_errors=True, onerror=None)
         os.makedirs(path)
         df_.to_csv(path+fileName)
     try:
-        df_=df_.loc[date.strftime("%m/%d/%Y"),'VIX Close']
+        df_ = df.read_csv(path+fileName,index_col=None, header=0)
+        df_ = df_.loc[date.strftime("%m/%d/%Y"),'VIX Close']
         #print df
         return df_
     except:
@@ -88,10 +89,34 @@ def main():
         if vix_pos_price != 'NaN': 
             uvxy_vix_pos_ratio = (uvxy_pos_price/vix_pos_price)
             uvxy_vix_curr_pos = uvxy_vix_pos_ratio
+            pos_vix_qty = (vix_pos_price/uvxy_pos_price)
+            if pos_vix_qty < 1:
+                pos_vix_qty=round(pos_vix_qty)
+                pos_uvxy_qty =1
+            else:
+                pos_vix_qty = 1
+                pos_uvxy_qty =round(pos_vix_qty)
+            pos_vix_op_price = 999
+            pos_vix_strick = 99
+            pos_vix_exp = '2018-01-01'
+            pos_uvxy_op_price = 999
+            pos_uvxy_strick = 99
+            pos_uvxy_exp= '2018-01-01'
+            pos_vix_amount = pos_vix_op_price * pos_vix_qty
+            pos_uvxy_amount = pos_uvxy_op_price*pos_uvxy_qty         
         else:
             uvxy_vix_pos_ratio = 'NaN'
             uvxy_vix_curr_pos = 'NaN'
-        res = np.array([open_pos_date,vix_pos_price,uvxy_pos_price,uvxy_vix_pos_ratio,uvxy_vix_curr_pos])
+            pos_vix_op_price = 'NaN'
+            pos_vix_strick = 'NaN'
+            pos_vix_exp = 'NaN'
+            pos_uvxy_op_price = 'NaN'
+            pos_uvxy_strick = 'NaN'
+            pos_uvxy_exp = 'NaN'
+            pos_vix_amount = 'NaN'
+            pos_uvxy_amount = 'NaN'
+            
+        res = np.array([open_pos_date,vix_pos_price,uvxy_pos_price,uvxy_vix_pos_ratio,uvxy_vix_curr_pos, pos_vix_qty,pos_vix_op_price, pos_vix_strick,pos_vix_exp, pos_uvxy_qty,pos_uvxy_op_price,pos_uvxy_qty,pos_uvxy_strick,pos_uvxy_exp,pos_vix_amount,pos_uvxy_amount])
         np_array_list.append(res)
     print np_array_list
     print '-------'
