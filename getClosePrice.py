@@ -15,6 +15,8 @@ from pyasn1.compat.octets import null
 from dateutil.relativedelta import relativedelta
 
 g_daysToClase = 5
+g_vixDF = None
+g_isLoaded = False
 #### getting vix data from cboe web site ####
 #### http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/vixcurrent.csv ####
 
@@ -62,23 +64,28 @@ def getStockClosePrice(stock, date):
         return 'NaN';
 
 def getVIXClosePrice(date):
-    
+    global g_isLoaded
+    global g_vixDF
     path ='./temp/'
     fileName = datetime.datetime.now().strftime("%d-%m-%Y") + '.csv'
     existfile = listdir(path)[0].split(".csv",1)[0] #glob.glob(path + '*')
     existFileDate = datetime.datetime.strptime(existfile, "%d-%m-%Y")
-    if (existFileDate < date): # create new file with updated vix data
+    if (existFileDate < date and g_isLoaded == False): # create new file with updated vix data
         url = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/vixcurrent.csv'
         response = requests.get(url)
-        df_ = df.read_csv(io.StringIO(response.content.decode('utf-8')),skiprows=1,index_col=0)
+        g_vixDF = df.read_csv(io.StringIO(response.content.decode('utf-8')),skiprows=1,index_col=0)
         shutil.rmtree(path,ignore_errors=True, onerror=None)
         os.makedirs(path)
-        df_.to_csv(path+fileName)
+        g_vixDF.to_csv(path+fileName)
+        
+    elif(g_isLoaded == False):
+            g_vixDF = df.read_csv(path+existfile + '.csv',index_col='Date', header=0)
+    g_isLoaded = True
+    
     try:
-        df_ = df.read_csv(path+existfile + '.csv',index_col='Date', header=0)
-        df_ = df_.loc[date.strftime("%m/%d/%Y"),'VIX Close']
-        return df_
+        return g_vixDF.loc[date.strftime("%m/%d/%Y"),'VIX Close']
     except:
+        g_isLoaded = True
         return 'NaN';
 
 
@@ -126,7 +133,7 @@ def main():
                 pos_uvxy_qty =round(pos_vix_qty)
             pos_vix_exp = (dateArr[i] + relativedelta(months=5)).strftime("%m-%Y")        
             pos_vix_strick = round(vix_pos_price*1.5)        
-            curr_vix_op_price = getOptClosePrice('VIX', 'yahoo', pos_vix_exp, pos_vix_strick ).iloc[0]['Last']
+            curr_vix_op_price = getOptClosePrice('^VIX', 'yahoo', pos_vix_exp, pos_vix_strick ).iloc[0]['Last']
             pos_vix_op_price = curr_vix_op_price
             pos_uvxy_exp= (dateArr[i] + relativedelta(months=6)).strftime("%m-%Y")
             pos_uvxy_strick = round(uvxy_pos_price*1.5)            
