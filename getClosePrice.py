@@ -44,11 +44,12 @@ def getOptClosePrice(stock,source,expDate, strick):
 
 def getStockClosePrice(stock, date):
     stock = stock
-    startdate = date.strftime("%m/%d/%Y")
-    enddate = (date + datetime.timedelta(days=1)).strftime("%m/%d/%Y")
+    enddate = datetime.date.today()
+    startdate =  (enddate - datetime.timedelta(days=2000)) #date.strftime("%m/%d/%Y")
+      # (date + datetime.timedelta(days=2000)).strftime("%m/%d/%Y")
     #print enddate
     rooturl = 'http://www.google.com/finance/historical?q='
-    query = stock + '&startdate=' + startdate +'&enddate=' + enddate + '&output=csv'
+    query = stock + '&startdate=' + startdate.strftime("%m/%d/%Y") +'&enddate=' + enddate.strftime("%m/%d/%Y") + '&output=csv'
     
     url = rooturl + query
     #print url
@@ -56,10 +57,14 @@ def getStockClosePrice(stock, date):
     response = requests.get(url)
     #except:
     #print "Unexpected error:", sys.exc_info()
-    df_ = df.read_csv(io.StringIO(response.content.decode('utf-8')))
-    #print(df)
+    
+    df_ = df.read_csv(io.StringIO(response.content.decode('utf-8')),index_col=0)
+    print '88888: ', date.strftime("%d-%b-%y"),  df_
+    #df_ = df_.loc[date.strftime("%d-%b-%y"),'Close']
+    print(df_)
     try:
-        return df_.get_value(0,'Close');
+        print '1111:', df_
+        return df_.loc[date.strftime("%d-%b-%y"),'Close']
     except:
         return 'NaN';
 
@@ -95,7 +100,7 @@ def main():
     df_opt = Options('UVXY', 'yahoo')
     data1 = df_opt.get_all_data()
     print data1
-    date = (datetime.date.today() - datetime.timedelta(days=20))
+    date = (datetime.date.today() - datetime.timedelta(days=200))
     #endDate = (datetime.date.today() - datetime.timedelta(days=1))
     print 'for date:' , date
     #print currDate.strftime("%m/%d/%Y")
