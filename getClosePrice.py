@@ -16,7 +16,11 @@ from dateutil.relativedelta import relativedelta
 
 g_daysToClase = 5
 g_vixDF = None
-g_isLoaded = False
+g_isVixLoaded = False
+g_uvxyDF = None
+g_isUvxyLoaded = False
+g_vixpath ='./vix/'
+g_uvxypath ='./uvxy/'
 #### getting vix data from cboe web site ####
 #### http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/vixcurrent.csv ####
 
@@ -38,68 +42,96 @@ def getOptClosePrice(stock,source,expDate, strick):
     '''
     #print '1: ' , data.loc[(strick, expDate, 'call'),:] #.iloc[0:5, 0:5]
     res = data.loc[(strick, expDate, 'call'),('Last','Underlying_Price')] #.iloc[0:5, 0:5]
-    print '1: ' , res
-    print '--------------'
+#    print '1: ' , res
+#    print '--------------'
     return res
 
 def getStockClosePrice(stock, date):
-    stock = stock
-    enddate = datetime.date.today()
-    startdate =  (enddate - datetime.timedelta(days=2000)) #date.strftime("%m/%d/%Y")
-      # (date + datetime.timedelta(days=2000)).strftime("%m/%d/%Y")
-    #print enddate
-    rooturl = 'http://www.google.com/finance/historical?q='
-    query = stock + '&startdate=' + startdate.strftime("%m/%d/%Y") +'&enddate=' + enddate.strftime("%m/%d/%Y") + '&output=csv'
+
+    global g_isUvxyLoaded
+    global g_uvxyDF
+    global g_uvxypath
+    existFileDate = datetime.datetime.strptime('01-01-1970',"%d-%m-%Y")
+    fileName = datetime.datetime.now().strftime("%d-%m-%Y") + '_uvxy.csv'
     
-    url = rooturl + query
-    #print url
-    #try:
-    response = requests.get(url)
-    #except:
-    #print "Unexpected error:", sys.exc_info()
-    
-    df_ = df.read_csv(io.StringIO(response.content.decode('utf-8')),index_col=0)
-    print '88888: ', date.strftime("%d-%b-%y"),  df_
-    #df_ = df_.loc[date.strftime("%d-%b-%y"),'Close']
-    print(df_)
+    newlist = []
+    for filename in listdir(g_uvxypath):
+        if filename.endswith('_uvxy.csv'):
+            newlist.append(filename)
+            
     try:
-        print '1111:', df_
-        return df_.loc[date.strftime("%d-%b-%y"),'Close']
+        existfile = newlist[0].split('_uvxy.csv',1)[0]
+        existFileDate = datetime.datetime.strptime(existfile, "%d-%m-%Y")
     except:
-        return 'NaN';
+        existFileDate = datetime.datetime.strptime('01-01-1970',"%d-%m-%Y")
+        
+    if (existFileDate < date and g_isUvxyLoaded == False): # create new file with updated vix data
+        
+        enddate = datetime.date.today()
+        startdate =  (enddate - datetime.timedelta(days=2000)) #date.strftime("%m/%d/%Y")
+
+        rooturl = 'http://www.google.com/finance/historical?q='
+        query = stock + '&startdate=' + startdate.strftime("%m/%d/%Y") +'&enddate=' + enddate.strftime("%m/%d/%Y") + '&output=csv'
+    
+        url = rooturl + query
+
+        response = requests.get(url)   
+        g_uvxyDF = df.read_csv(io.StringIO(response.content.decode('utf-8')),index_col=0)
+        shutil.rmtree(g_uvxypath,ignore_errors=True, onerror=None)
+        os.makedirs(g_uvxypath)
+        g_uvxyDF.to_csv(g_uvxypath+fileName)
+        
+    elif(g_isUvxyLoaded == False):
+            g_uvxyDF = df.read_csv(g_uvxypath+existfile + '_uvxy.csv',index_col='Date', header=0)
+    g_isUvxyLoaded = True
+    
+    try:
+        return g_uvxyDF.loc[date.strftime("%d-%b-%y"),'Close']
+    except:
+        g_isUvxyLoaded = True
+        return 'NaN';    
 
 def getVIXClosePrice(date):
-    global g_isLoaded
+    global g_isVixLoaded
     global g_vixDF
-    path ='./temp/'
-    fileName = datetime.datetime.now().strftime("%d-%m-%Y") + '.csv'
-    existfile = listdir(path)[0].split(".csv",1)[0] #glob.glob(path + '*')
-    existFileDate = datetime.datetime.strptime(existfile, "%d-%m-%Y")
-    if (existFileDate < date and g_isLoaded == False): # create new file with updated vix data
+    global g_vixpath
+    existFileDate = datetime.datetime.strptime('01-01-1970',"%d-%m-%Y")
+    fileName = datetime.datetime.now().strftime("%d-%m-%Y") + '_vix.csv'
+    newlist = []
+    for filename in listdir(g_vixpath):
+        if filename.endswith('_vix.csv'):
+            newlist.append(filename)
+    try:
+        existfile = newlist[0].split('_vix.csv',1)[0]
+        existFileDate = datetime.datetime.strptime(existfile, "%d-%m-%Y")
+    except:
+        existFileDate = datetime.datetime.strptime('01-01-1970',"%d-%m-%Y")    
+    
+    if (existFileDate < date and g_isVixLoaded == False): # create new file with updated vix data
         url = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/vixcurrent.csv'
         response = requests.get(url)
         g_vixDF = df.read_csv(io.StringIO(response.content.decode('utf-8')),skiprows=1,index_col=0)
-        shutil.rmtree(path,ignore_errors=True, onerror=None)
-        os.makedirs(path)
-        g_vixDF.to_csv(path+fileName)
+        shutil.rmtree(g_vixpath,ignore_errors=True, onerror=None)
+        os.makedirs(g_vixpath)
+        g_vixDF.to_csv(g_vixpath+fileName)
         
-    elif(g_isLoaded == False):
-            g_vixDF = df.read_csv(path+existfile + '.csv',index_col='Date', header=0)
-    g_isLoaded = True
+    elif(g_isVixLoaded == False):
+            g_vixDF = df.read_csv(g_vixpath+existfile + '_vix.csv',index_col='Date', header=0)
+    g_isVixLoaded = True
     
     try:
         return g_vixDF.loc[date.strftime("%m/%d/%Y"),'VIX Close']
     except:
-        g_isLoaded = True
+        g_isVixLoaded = True
         return 'NaN';
 
 
 def main():
     #print getVixClosePrice('08/22/2017')
     #currDate = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%m/%d/%Y")
-    df_opt = Options('UVXY', 'yahoo')
-    data1 = df_opt.get_all_data()
-    print data1
+    #df_opt = Options('^VIX', 'yahoo')
+    #data1 = df_opt.get_all_data()
+    #print '1212121:' , data1
     date = (datetime.date.today() - datetime.timedelta(days=200))
     #endDate = (datetime.date.today() - datetime.timedelta(days=1))
     print 'for date:' , date
@@ -107,11 +139,11 @@ def main():
     #print getVIXClosePrice(date)
     #print df_vixClosePrice
     #print getStockClosePrice('UVXY', startDate)
-    print getOptClosePrice('UVXY', 'yahoo', '2018-03', 46 ).iloc[0]['Last']
+    #print getOptClosePrice('UVXY', 'yahoo', '2018-03', 46 ).iloc[0]['Last']
     
       
     todays_date = datetime.datetime.now().date()
-    dateArr = df.date_range(todays_date-datetime.timedelta(5), periods=5, freq='D')
+    dateArr = df.date_range(todays_date-datetime.timedelta(10), periods=10, freq='D')
     newFileName = './temp/positionFile.csv'
     #print index[1]
     
@@ -120,7 +152,7 @@ def main():
   
     np_array_list = []
     
-    for i in range(5):
+    for i in range(len(dateArr)):
         print i ,'------'
         open_pos_date = dateArr[i]
         vix_pos_price = getVIXClosePrice(dateArr[i])
@@ -185,7 +217,7 @@ def main():
     big_frame.columns = ["open_pos_date","vix_pos_price","uvxy_pos_price","uvxy_vix_pos_ratio","uvxy_vix_curr_pos", "pos_vix_qty","pos_vix_op_price","curr_vix_op_price", "pos_vix_strick","pos_vix_exp", "pos_uvxy_qty","pos_uvxy_op_price","curr_uvxy_op_price","pos_uvxy_qty","pos_uvxy_strick","pos_uvxy_exp","pos_vix_amount","pos_uvxy_amount","curr_pos_vix_value","curr_pos_uvxy_value","days_pass","is_55_days_pass","pos_ratio_075", "pos_status", "pos_gain"]
     #big_frame.set_index(['open_pos_date'])
    # big_frame.to_csv(newFileName, index=False,header=True)
-    big_frame.to_csv(newFileName,header=True)
+    big_frame.to_csv(newFileName,sep= '\t',header=True,index_label='open_pos_date')
 
     #df_ = pandas.DataFrame(result_array,index=index, columns=columns)
     #df_ = df_.fillna(0) # with 0s rather than NaNs
